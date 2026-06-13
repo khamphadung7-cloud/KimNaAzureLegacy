@@ -1,63 +1,42 @@
-import discord
+import discord, io
 from discord import app_commands
-from discord.ext import commands, tasks
-from PIL import Image, ImageDraw, ImageFont, ImageOps
-import io
-import imageio
+from discord.ext import commands
+from PIL import Image, ImageDraw, ImageFont
 from datetime import datetime
 import pytz
 
-class WelcomeSystem(commands.Cog):
+class Welcome(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.invites = {}
-        self.keep_alive_task.start()
 
-    def cog_unload(self):
-        self.keep_alive_task.cancel()
-
-    # --- 1. ระบบกันดับ (Keep-Alive) ---
-    @tasks.loop(minutes=3)
-    async def keep_alive_task(self):
-        print(f"🔄 [Keep-Alive] บอตยังรันอยู่: {datetime.now(pytz.timezone('Asia/Bangkok')).strftime('%H:%M:%S')}")
-
-    # --- 2. ระบบต้อนรับสมาชิกใหม่ (Welcome) ---
     @commands.Cog.listener()
     async def on_member_join(self, member):
         guild = member.guild
-        # เพิ่มยศอัตโนมัติ
+        # 1. ยศอัตโนมัติ
         role = discord.utils.get(guild.roles, name="Member")
         if role: await member.add_roles(role)
 
-        # สร้างรูป (พิกัดตามดีไซน์ที่คุยกัน)
+        # 2. สร้างรูป (ใช้พื้นหลัง welcome_bg.png)
         try:
-            background = Image.open("welcome_bg.png").convert("RGBA")
-            draw = ImageDraw.Draw(background)
-            font_main = ImageFont.truetype("TH_font.ttf", 35)
-            font_id = ImageFont.truetype("TH_font.ttf", 30)
-
-            # แปะชื่อและข้อมูล
-            draw.text((960, 185), f"{guild.name}", fill=(255, 255, 255), font=font_main, anchor="ms")
-            draw.text((900, 335), f"#{len(guild.members):,}", fill=(255, 255, 255), font=font_id)
-            draw.text((900, 435), f"@{member.name}", fill=(255, 255, 255), font=font_id)
+            bg = Image.open("welcome_bg.png").convert("RGBA")
+            draw = ImageDraw.Draw(bg)
+            font = ImageFont.truetype("TH_font.ttf", 35)
             
-            # ส่งรูป
-            final_buffer = io.BytesIO()
-            background.save(final_buffer, format="PNG")
-            final_buffer.seek(0)
+            draw.text((960, 185), guild.name, fill=(255, 255, 255), font=font, anchor="ms")
+            draw.text((900, 435), f"@{member.name}", fill=(255, 255, 255), font=font)
+            
+            buf = io.BytesIO()
+            bg.save(buf, format="PNG")
+            buf.seek(0)
+            
             channel = discord.utils.get(guild.text_channels, name="welcome")
-            if channel:
-                await channel.send(f"ยินดีต้อนรับ {member.mention}!", file=discord.File(final_buffer, "welcome.png"))
+            if channel: await channel.send(f"ยินดีต้อนรับ {member.mention}!", file=discord.File(buf, "welcome.png"))
         except Exception as e:
-            print(f"❌ Error ต้อนรับ: {e}")
+            print(f"Error: {e}")
 
-    # --- 3. คำสั่ง Slash Command (/testwelcome) ---
-    @app_commands.command(name="testwelcome", description="ทดสอบระบบต้อนรับ")
-    @app_commands.checks.has_permissions(administrator=True)
+    @app_commands.command(name="testwelcome", description="ทดสอบระบบ")
     async def testwelcome(self, interaction: discord.Interaction):
-        await interaction.response.send_message("กำลังทดสอบสร้างรูป...", ephemeral=True)
+        await interaction.response.send_message("ทดสอบการต้อนรับ...", ephemeral=True)
         await self.on_member_join(interaction.user)
 
-async def setup(bot):
-    await bot.add_cog(WelcomeSystem(bot))
-  
+async def setup(bot): await bot.add_cog(Welcome(bot))

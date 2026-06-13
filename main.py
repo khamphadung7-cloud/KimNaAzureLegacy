@@ -51,3 +51,29 @@ if token:
     bot.run(token)
 else:
     print("❌ Error: ไม่พบ DISCORD_TOKEN ใน Environment Variable ของ Render")
+import discord, os, aiohttp
+from discord.ext import commands
+from flask import Flask
+from threading import Thread
+
+# Web Server กันดับ (ใช้คู่กับ UptimeRobot จะดีมาก)
+app = Flask(__name__)
+@app.route('/')
+def home(): return "บอตต้อนรับออนไลน์ 24 ชม."
+def run_server(): app.run(host='0.0.0.0', port=8080)
+Thread(target=run_server).start()
+
+# ตั้งค่าบอต
+intents = discord.Intents.all()
+bot = commands.Bot(command_prefix="!", intents=intents)
+
+@bot.event
+async def on_ready():
+    bot.session = aiohttp.ClientSession()
+    # โหลด Cog ต้อนรับ
+    await bot.load_extension('cogs.welcome')
+    # Sync Slash Commands
+    await bot.tree.sync()
+    print(f"✅ บอตพร้อมรบ! {bot.user} เชื่อมต่อแล้ว")
+
+bot.run(os.environ.get("DISCORD_TOKEN"))

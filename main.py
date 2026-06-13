@@ -1,10 +1,11 @@
 import discord
 import os
+import aiohttp
 from discord.ext import commands
 from flask import Flask
 from threading import Thread
 
-# 1. ระบบ Web Server จิ๋ว (เพื่อให้ Render มองว่าเป็นเว็บไซต์)
+# 1. ระบบ Web Server (สำหรับกันดับบน Render)
 app = Flask(__name__)
 @app.route('/')
 def home():
@@ -13,26 +14,40 @@ def home():
 def run_server():
     app.run(host='0.0.0.0', port=8080)
 
-# 2. เริ่มต้นรัน Web Server
 server = Thread(target=run_server)
 server.start()
 
-# 3. ส่วนของบอต Discord
+# 2. ตั้งค่า Intent (ต้องใช้สำหรับการตรวจจับสมาชิกใหม่)
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 @bot.event
 async def on_ready():
-    # โหลด Cogs
+    # สร้าง Session สำหรับดึงรูป
+    bot.session = aiohttp.ClientSession()
+    
+    # โหลด Cogs จากโฟลเดอร์ cogs
+    if not os.path.exists('./cogs'):
+        os.makedirs('./cogs')
+        
     for filename in os.listdir('./cogs'):
         if filename.endswith('.py') and filename != "__init__.py":
-            await bot.load_extension(f'cogs.{filename[:-3]}')
+            try:
+                await bot.load_extension(f'cogs.{filename[:-3]}')
+                print(f"📦 โหลด Cog: {filename} สำเร็จ")
+            except Exception as e:
+                print(f"❌ โหลด Cog {filename} ไม่ได้: {e}")
     
-    # Sync Slash Commands
+    # Sync คำสั่ง Slash Command
     try:
         await bot.tree.sync()
-        print(f"✅ บอตออนไลน์แล้วและ Sync คำสั่ง / เรียบร้อย!")
+        print(f"✅ บอตออนไลน์แล้ว! พร้อมใช้งาน Slash Commands")
     except Exception as e:
-        print(f"❌ Error syncing: {e}")
+        print(f"❌ Error syncing commands: {e}")
 
-bot.run(os.environ.get("DISCORD_TOKEN"))
+# 3. รันบอต (ดึง Token จาก Environment Variables ของ Render)
+token = os.environ.get("DISCORD_TOKEN")
+if token:
+    bot.run(token)
+else:
+    print("❌ Error: ไม่พบ DISCORD_TOKEN ใน Environment Variable ของ Render")

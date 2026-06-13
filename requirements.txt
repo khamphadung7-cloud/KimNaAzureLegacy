@@ -1,2 +1,5 @@
 discord.py
-flask
+Pillow
+imageio
+pytz
+aiohttp

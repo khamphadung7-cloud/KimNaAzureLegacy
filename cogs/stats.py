@@ -1,70 +1,51 @@
+"""
+📊 Stats - สถิติและข้อมูล
+"""
 import discord
-from discord.ext import commands
 from discord import app_commands
-import json
-import os
+from discord.ext import commands
+import logging
+
+logger = logging.getLogger("Stats")
 
 class Stats(commands.Cog):
+    """📊 สถิติ"""
+    
     def __init__(self, bot):
         self.bot = bot
-        self.stats_file = "stats.json"
-        self.load_stats()
-
-    def load_stats(self):
-        if os.path.exists(self.stats_file):
-            with open(self.stats_file, 'r') as f:
-                self.stats = json.load(f)
-        else:
-            self.stats = {}
-
-    def save_stats(self):
-        with open(self.stats_file, 'w') as f:
-            json.dump(self.stats, f, indent=4)
-
-    @commands.Cog.listener()
-    async def on_message(self, message):
-        if message.author.bot:
-            return
-        
-        user_id = str(message.author.id)
-        if user_id not in self.stats:
-            self.stats[user_id] = {"messages": 0, "reactions": 0}
-        
-        self.stats[user_id]["messages"] += 1
-        self.save_stats()
-
-    @app_commands.command(name="mystats", description="ดูสถิติของคุณ")
-    async def mystats(self, interaction: discord.Interaction, member: discord.Member = None):
-        if member is None:
-            member = interaction.user
-        
-        user_id = str(member.id)
-        user_stats = self.stats.get(user_id, {"messages": 0, "reactions": 0})
-        
+        self.color = discord.Color.from_rgb(100, 100, 255)
+    
+    @app_commands.command(name="botstats", description="📊 สถิติบอท")
+    async def botstats(self, interaction: discord.Interaction):
+        """ดูสถิติบอท"""
         embed = discord.Embed(
-            title="📊 สถิติ",
-            color=0x2E64FE
+            title="📊 สถิติบอท",
+            color=self.color
         )
-        embed.add_field(name="สมาชิก", value=member.mention, inline=False)
-        embed.add_field(name="ข้อความ", value=user_stats.get("messages", 0), inline=False)
-        embed.add_field(name="ปฏิกิริยา", value=user_stats.get("reactions", 0), inline=False)
-        
+        embed.add_field(name="🤖 ชื่อบอท", value=self.bot.user.name, inline=True)
+        embed.add_field(name="🟢 สถานะ", value="Online", inline=True)
+        embed.add_field(name="📊 Ping", value=f"{round(self.bot.latency * 1000)}ms", inline=True)
+        embed.add_field(name="🏢 เซิร์ฟเวอร์", value=len(self.bot.guilds), inline=True)
+        embed.add_field(name="👥 ผู้ใช้", value=len(self.bot.users), inline=True)
+        embed.add_field(name="📚 Cogs", value=len(self.bot.cogs), inline=True)
         await interaction.response.send_message(embed=embed)
-
-    @app_commands.command(name="serverstats", description="ดูสถิติเซิร์ฟเวอร์")
-    async def serverstats(self, interaction: discord.Interaction):
-        guild = interaction.guild
+    
+    @app_commands.command(name="topservers", description="🏆 เซิร์ฟเวอร์ที่เยี่ยม")
+    async def topservers(self, interaction: discord.Interaction):
+        """ดูเซิร์ฟเวอร์ที่เยี่ยม"""
+        guilds = sorted(self.bot.guilds, key=lambda g: g.member_count, reverse=True)[:10]
         embed = discord.Embed(
-            title="📊 สถิติเซิร์ฟเวอร์",
-            color=0x2E64FE
+            title="🏆 เซิร์ฟเวอร์ Top 10",
+            color=self.color
         )
-        embed.add_field(name="ชื่อ", value=guild.name, inline=False)
-        embed.add_field(name="สมาชิก", value=guild.member_count, inline=False)
-        embed.add_field(name="ช่อง", value=len(guild.channels), inline=False)
-        embed.add_field(name="ยศ", value=len(guild.roles), inline=False)
-        
+        for i, guild in enumerate(guilds, 1):
+            embed.add_field(
+                name=f"{i}. {guild.name}",
+                value=f"👥 {guild.member_count} คน",
+                inline=False
+            )
         await interaction.response.send_message(embed=embed)
 
 async def setup(bot):
     await bot.add_cog(Stats(bot))
-    print("✅ Stats Cog loaded!")
+    logger.info("✅ Stats Cog")

@@ -1,5 +1,6 @@
-import discord, os, aiohttp, asyncio
+import discord, os, asyncio, random
 from discord.ext import commands
+from discord import app_commands  # <--- เสี่ยต้องใส่บรรทัดนี้เพิ่มเข้าไปครับ!
 from flask import Flask
 from threading import Thread
 

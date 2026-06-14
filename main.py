@@ -1,8 +1,8 @@
-main.py
 import os
 import aiohttp
 import asyncio
 import logging
+import discord
 from discord.ext import commands, tasks
 from flask import Flask, jsonify
 from threading import Thread

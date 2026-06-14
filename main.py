@@ -1,5 +1,4 @@
-name=main.py
-import discord
+main.py
 import os
 import aiohttp
 import asyncio
@@ -104,7 +103,7 @@ PRICING = {
         "features": ["ทุกอย่างใน Basic", "ระบบ Database", "Support 24/7"]
     },
     "enterprise": {
-        "name": "แพ็คเกจองค์��ร",
+        "name": "แพ็คเกจองค์กร",
         "price": 999,
         "features": ["ทุกอย่างใน Premium", "API Custom", "ตัวแทนสนับสนุนส่วนตัว"]
     }

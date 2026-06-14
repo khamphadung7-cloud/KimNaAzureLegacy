@@ -5,35 +5,75 @@ import aiohttp
 import asyncio
 import logging
 from discord.ext import commands, tasks
-from flask import Flask
+from flask import Flask, jsonify
 from threading import Thread
 from datetime import datetime
+import requests
 
 # ⚙️ ตั้งค่า Logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger("KimNaAzure")
 
-# 🌐 Web Server สำหรับ Keep-Alive (Render.com)
+# 🌐 Web Server สำหรับ Render.com Keep-Alive
 app = Flask(__name__)
+
+# 📊 สถิติ
+STATS = {
+    "start_time": datetime.now(),
+    "ping_count": 0,
+    "bot_status": "offline"
+}
 
 @app.route('/')
 def home():
-    return {
+    """หน้าแรก"""
+    uptime = (datetime.now() - STATS["start_time"]).total_seconds()
+    hours = int(uptime // 3600)
+    minutes = int((uptime % 3600) // 60)
+    seconds = int(uptime % 60)
+    
+    return jsonify({
         "status": "✅ RUNNING",
         "bot_name": "KIMNA AZURE LEGACY",
-        "timestamp": datetime.now().isoformat()
-    }, 200
+        "timestamp": datetime.now().isoformat(),
+        "bot_status": STATS["bot_status"],
+        "uptime": f"{hours}h {minutes}m {seconds}s",
+        "ping_count": STATS["ping_count"]
+    }), 200
 
 @app.route('/ping')
 def ping():
-    """Endpoint สำหรับการ Ping URL ทุก 1 นาที"""
-    return {"message": "🏓 Pong! บอทยังมีชีวิตอยู่", "time": datetime.now().isoformat()}, 200
+    """Endpoint สำหรับการ Keep-Alive Ping"""
+    STATS["ping_count"] += 1
+    return jsonify({
+        "message": "🏓 Pong! บอทยังมีชีวิตอยู่",
+        "time": datetime.now().isoformat(),
+        "ping_number": STATS["ping_count"]
+    }), 200
+
+@app.route('/status')
+def status():
+    """ดูสถานะบอท"""
+    return jsonify({
+        "bot_status": STATS["bot_status"],
+        "last_ping": datetime.now().isoformat(),
+        "uptime": str(datetime.now() - STATS["start_time"])
+    }), 200
+
+@app.route('/health')
+def health():
+    """Health Check สำหรับ Render"""
+    return jsonify({"healthy": True}), 200
 
 def run_flask():
     """รัน Flask Server ในเธรด"""
     try:
-        logger.info("🚀 Flask Server เริ่มต้นบน http://0.0.0.0:8080")
-        app.run(host='0.0.0.0', port=8080, debug=False)
+        port = int(os.environ.get("PORT", 8080))
+        logger.info(f"🚀 Flask Server เริ่มต้นบน http://0.0.0.0:{port}")
+        app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
     except Exception as e:
         logger.error(f"❌ Flask Error: {e}")
 
@@ -48,25 +88,37 @@ BOT_CONFIG = {
     "version": "1.0.0",
     "owner": "ToneyToyau",
     "prefix": "!",
-    "color": discord.Color.from_rgb(0, 150, 255)  # สีฟ้าสวย
+    "color": discord.Color.from_rgb(0, 150, 255)  # สีฟ้า
 }
 
-# 💰 ข้อมูลราคา (ปรับได้)
+# 💰 ข้อมูลราคา
 PRICING = {
-    "basic": {"name": "แพ็คเกจพื้นฐาน", "price": 0, "features": ["คำสั่งพื้นฐาน", "ตอบสนองแบบ Real-time"]},
-    "premium": {"name": "แพ็คเกจพรีเมียม", "price": 99, "features": ["ทุกอย่างใน Basic", "ระบบ Database", "Support 24/7"]},
-    "enterprise": {"name": "แพ็คเกจองค์กร", "price": 999, "features": ["ทุกอย่างใน Premium", "API Custom", "ตัวแทนสนับสนุนส่วนตัว"]}
+    "basic": {
+        "name": "แพ็คเกจพื้นฐาน",
+        "price": 0,
+        "features": ["คำสั่งพื้นฐาน", "ตอบสนองแบบ Real-time"]
+    },
+    "premium": {
+        "name": "แพ็คเกจพรีเมียม",
+        "price": 99,
+        "features": ["ทุกอย่างใน Basic", "ระบบ Database", "Support 24/7"]
+    },
+    "enterprise": {
+        "name": "แพ็คเกจองค์��ร",
+        "price": 999,
+        "features": ["ทุกอย่างใน Premium", "API Custom", "ตัวแทนสนับสนุนส่วนตัว"]
+    }
 }
 
 async def load_extensions():
-    """โหลด Cogs ทั้งหมดจากโฟลเดอร์ cogs"""
+    """โหลด Cogs ทั้งหมด"""
     loaded = 0
     failed = 0
     cogs_dir = './cogs'
     
     if not os.path.exists(cogs_dir):
         os.makedirs(cogs_dir)
-        logger.warning(f"⚠️ สร้างโฟลเดอร์ {cogs_dir} ใหม่")
+        logger.warning(f"⚠️ สร้างโฟลเดอร์ {cogs_dir}")
     
     for filename in os.listdir(cogs_dir):
         if filename.endswith('.py') and not filename.startswith('_'):
@@ -79,13 +131,14 @@ async def load_extensions():
                 failed += 1
     
     logger.info(f"\n{'='*60}")
-    logger.info(f"📊 ผลการโหลด Cogs: ✅ {loaded} สำเร็จ | ❌ {failed} ล้มเหลว")
+    logger.info(f"📊 ผลการโหลด Cogs: ✅ {loaded} | ❌ {failed}")
     logger.info(f"{'='*60}\n")
 
 @bot.event
 async def on_ready():
     """เมื่อบอทเชื่อมต่อสำเร็จ"""
     try:
+        STATS["bot_status"] = "online"
         bot.session = aiohttp.ClientSession()
         await load_extensions()
         
@@ -95,7 +148,7 @@ async def on_ready():
             synced = await bot.tree.sync()
             logger.info(f"✅ Sync {len(synced)} Slash Commands!")
         except discord.errors.HTTPException:
-            logger.warning("⚠️ Rate Limited - จะลองใหม่ใน 60 วินาที...")
+            logger.warning("⚠️ Rate Limited - ลองใหม่ใน 60 วินาที...")
             await asyncio.sleep(60)
             try:
                 await bot.tree.sync()
@@ -116,46 +169,51 @@ async def on_ready():
         logger.info(f"✅ บอท {bot.user} เชื่อมต่อสำเร็จ!")
         logger.info(f"📌 ชื่อ: {BOT_CONFIG['name']}")
         logger.info(f"📌 เวอร์ชัน: {BOT_CONFIG['version']}")
-        logger.info(f"📌 เจ้าของ: {BOT_CONFIG['owner']}")
         logger.info(f"{'='*60}\n")
         
         # เริ่ม Keep-Alive Task
         if not keep_alive_task.is_running():
             keep_alive_task.start()
-            logger.info("✅ Keep-Alive Task เริ่มต้นแล้ว")
+            logger.info("✅ Keep-Alive Task เริ่มต้นแล้ว (ทุก 5 นาที)")
     
     except Exception as e:
         logger.error(f"❌ ข้อผิดพลาด on_ready: {e}")
+        STATS["bot_status"] = "error"
 
 @bot.event
 async def on_error(event, *args, **kwargs):
-    """จัดการ Error ที่เกิดขึ้น"""
+    """จัดการ Error"""
     logger.error(f"❌ ข้อผิดพลาด [{event}]: {args}")
 
-# 🔄 Task สำหรับ Keep-Alive (Ping URL ทุก 1 นาที)
-@tasks.loop(minutes=1)
+# 🔄 Keep-Alive Task (Ping ทุก 5 นาที)
+@tasks.loop(minutes=5)
 async def keep_alive_task():
-    """Ping URL ทุก 1 นาที เพื่อให้บอทไม่หลับ"""
+    """Ping URL ตัวเองทุก 5 นาที"""
     try:
-        if bot.session:
-            async with bot.session.get('http://localhost:8080/ping') as resp:
+        # ดึง URL ของ Render
+        render_url = os.environ.get("RENDER_EXTERNAL_URL", "http://localhost:8080")
+        
+        async with bot.session.get(f"{render_url}/ping") as resp:
+            if resp.status == 200:
                 data = await resp.json()
-                logger.info(f"🏓 Keep-Alive Ping สำเร็จ: {data.get('message')}")
+                logger.info(f"🏓 Keep-Alive Ping #{data.get('ping_number')}: สำเร็จ")
+            else:
+                logger.warning(f"⚠️ Keep-Alive ได้ Status: {resp.status}")
     except Exception as e:
-        logger.warning(f"⚠️ Keep-Alive Ping ล้มเหลว: {e}")
+        logger.warning(f"⚠️ Keep-Alive ล้มเหลว: {e}")
 
 @keep_alive_task.before_loop
 async def before_keep_alive():
-    """รอให้บอทพร้อมก่อน"""
+    """รอให้บอทพร้อม"""
     await bot.wait_until_ready()
 
-# 🎨 Slash Command - /help (แสดงคำสั่ง)
-@bot.tree.command(name="help", description="📖 แสดงคำสั่งทั้งหมดของบอท")
+# 📖 Slash Command: /help
+@bot.tree.command(name="help", description="📖 แสดงคำสั่งทั้งหมด")
 async def help_command(interaction: discord.Interaction):
-    """แสดงคำสั่งพื้นฐาน"""
+    """แสดงคำสั่ง"""
     embed = discord.Embed(
         title=f"📖 {BOT_CONFIG['name']} - ศูนย์ช่วยเหลือ",
-        description="คำสั่งทั้งหมดของบอทนี้",
+        description="คำสั่งทั้งหมดของบอท",
         color=BOT_CONFIG["color"],
         timestamp=datetime.now()
     )
@@ -172,66 +230,65 @@ async def help_command(interaction: discord.Interaction):
         inline=False
     )
     
-    embed.set_footer(text=f"v{BOT_CONFIG['version']} | เจ้าของ: {BOT_CONFIG['owner']}")
+    embed.set_footer(text=f"v{BOT_CONFIG['version']}")
     
     await interaction.response.send_message(embed=embed)
 
-# 💰 Slash Command - /pricing (แสดงราคา)
-@bot.tree.command(name="pricing", description="💰 ดูแพ็คเกจราคาและฟีเจอร์")
+# 💰 Slash Command: /pricing
+@bot.tree.command(name="pricing", description="💰 ดูแพ็คเกจราคา")
 async def pricing_command(interaction: discord.Interaction):
-    """แสดงแพ็คเกจราคา"""
+    """แสดงราคา"""
     embed = discord.Embed(
-        title="💰 แพ็คเกจราคาและฟีเจอร์",
+        title="💰 แพ็คเกจราคา",
         description="เลือกแพ็คเกจที่เหมาะกับคุณ",
         color=BOT_CONFIG["color"]
     )
     
     for key, package in PRICING.items():
-        features_text = "\n".join([f"✅ {feature}" for feature in package['features']])
+        features = "\n".join([f"✅ {f}" for f in package['features']])
         embed.add_field(
             name=f"📦 {package['name']}",
-            value=f"💵 ราคา: {package['price']} บาท\n\n{features_text}",
+            value=f"💵 {package['price']} บาท\n\n{features}",
             inline=False
         )
     
-    embed.set_footer(text="📞 ติดต่อสอบถามเพิ่มเติมได้ที่: Support Server")
-    
     await interaction.response.send_message(embed=embed)
 
-# ℹ️ Slash Command - /info (ข้อมูลบอท)
-@bot.tree.command(name="info", description="ℹ️ ข้อมูลเกี่ยวกับบอท")
+# ℹ️ Slash Command: /info
+@bot.tree.command(name="info", description="ℹ️ ข้อมูลบอท")
 async def info_command(interaction: discord.Interaction):
-    """แสดงข้อมูลบอท"""
+    """แสดงข้อมูล"""
+    uptime = (datetime.now() - STATS["start_time"]).total_seconds()
+    hours = int(uptime // 3600)
+    minutes = int((uptime % 3600) // 60)
+    
     embed = discord.Embed(
         title=f"ℹ️ {BOT_CONFIG['name']}",
-        description=f"บอท Discord ชั้นเยี่ยมของคุณ",
         color=BOT_CONFIG["color"],
         timestamp=datetime.now()
     )
     
-    embed.add_field(name="📌 ชื่อบอท", value=BOT_CONFIG['name'], inline=True)
+    embed.add_field(name="📌 ชื่อ", value=BOT_CONFIG['name'], inline=True)
     embed.add_field(name="📌 เวอร์ชัน", value=BOT_CONFIG['version'], inline=True)
     embed.add_field(name="👤 เจ้าของ", value=BOT_CONFIG['owner'], inline=True)
-    embed.add_field(name="📚 Library", value="discord.py", inline=True)
-    embed.add_field(name="⏰ สถานะ", value="🟢 Online", inline=True)
+    embed.add_field(name="⏰ Uptime", value=f"{hours}h {minutes}m", inline=True)
     embed.add_field(name="📊 Ping", value=f"{round(bot.latency * 1000)}ms", inline=True)
-    
-    embed.set_thumbnail(url=bot.user.avatar.url if bot.user else "")
-    embed.set_footer(text=f"เวลา: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
+    embed.add_field(name="🟢 สถานะ", value=STATS["bot_status"].upper(), inline=True)
     
     await interaction.response.send_message(embed=embed)
 
-# 🚀 เริ่มต้นบอท
+# 🚀 เริ่มต้น
 if __name__ == "__main__":
-    # เริ่มต้น Flask Server ในเธรด
+    logger.info("🚀 เริ่มต้น KIMNA AZURE LEGACY...")
+    
+    # เริ่ม Flask Server
     flask_thread = Thread(target=run_flask, daemon=True)
     flask_thread.start()
-    logger.info("🚀 Flask Server Thread เริ่มต้นแล้ว")
     
-    # รับ Token และเริ่มบอท
+    # รับ Token
     token = os.environ.get("DISCORD_TOKEN")
     if token:
         logger.info("✅ พบ DISCORD_TOKEN - กำลังเริ่มบอท...")
         bot.run(token)
     else:
-        logger.error("❌ ไม่พบ DISCORD_TOKEN ในตัวแปร Environment!")
+        logger.error("❌ ไม่พบ DISCORD_TOKEN!")

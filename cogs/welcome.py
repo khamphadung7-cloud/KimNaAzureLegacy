@@ -2,51 +2,56 @@ import discord, io, datetime
 from discord import app_commands
 from discord.ext import commands
 from PIL import Image, ImageDraw, ImageFont
+import json, os
 
 class Welcome(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.config_file = "welcome_config.json"
+        self.load_config()
+
+    def load_config(self):
+        if os.path.exists(self.config_file):
+            with open(self.config_file, 'r') as f:
+                self.config = json.load(f)
+        else:
+            self.config = {}
+
+    def save_config(self):
+        with open(self.config_file, 'w') as f:
+            json.dump(self.config, f, indent=4)
+
+    @app_commands.command(name="setwelcomemessage", description="เซตข้อความต้อนรับ")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def setwelcomemessage(self, interaction: discord.Interaction, message: str):
+        guild_id = str(interaction.guild.id)
+        if guild_id not in self.config:
+            self.config[guild_id] = {}
+        self.config[guild_id]['welcome_message'] = message
+        self.save_config()
+        await interaction.response.send_message(f"✅ เซตข้อความต้อนรับแล้ว", ephemeral=True)
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
         guild = member.guild
-        # 1. ยศอัตโนมัติ
-        role = discord.utils.get(guild.roles, name="Member")
-        if role: await member.add_roles(role)
+        guild_id = str(guild.id)
+        
+        # ข้อความต้อนรับ
+        config = self.config.get(guild_id, {})
+        welcome_msg = config.get('welcome_message', f'ยินดีต้อนรับ {member.mention}')
+        
+        channel = discord.utils.get(guild.text_channels, name="welcome") or discord.utils.get(guild.text_channels, name="📢-ประกาศ")
+        if channel:
+            embed = discord.Embed(
+                title="👋 ยินดีต้อนรับ",
+                description=f"{member.mention}\n{welcome_msg}",
+                color=0x2E64FE
+            )
+            embed.set_thumbnail(url=member.avatar.url)
+            embed.add_field(name="สมาชิกคนที่", value=f"#{guild.member_count}", inline=True)
+            embed.add_field(name="สร้างบัญชี", value=f"<t:{int(member.created_at.timestamp())}:R>", inline=True)
+            await channel.send(embed=embed)
 
-        # 2. วาดรูปต้อนรับ
-        try:
-            bg = Image.open("welcome_bg.png").convert("RGBA")
-            draw = ImageDraw.Draw(bg)
-            
-            # ใช้ฟอนต์ Sriracha ที่ชื่อไฟล์ TH_font.ttf
-            font_size = 32
-            font = ImageFont.truetype("TH_font.ttf", font_size)
-            
-            # พิกัดตำแหน่งข้อความ (ปรับให้เข้ากับช่องในรูปของเสี่ย)
-            # x = ขวา/ซ้าย, y = บน/ล่าง
-            draw.text((700, 275), f"Member #{guild.member_count}", fill=(255, 255, 255), font=font) # เข้าคนที่
-            draw.text((700, 350), f"{member.name}", fill=(255, 255, 255), font=font)              # ชื่อสมาชิก
-            draw.text((700, 425), f"Invite by Link", fill=(255, 255, 255), font=font)              # ใครเชิญ
-            draw.text((700, 500), f"Member", fill=(255, 255, 255), font=font)                      # ยศหลัก
-            
-            # เวลาปัจจุบัน
-            now = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
-            draw.text((700, 580), f"{now}", fill=(255, 255, 255), font=font)                      # ข้อมูลเวลา
-            
-            buf = io.BytesIO()
-            bg.save(buf, format="PNG")
-            buf.seek(0)
-            
-            channel = discord.utils.get(guild.text_channels, name="welcome")
-            if channel: 
-                await channel.send(f"ยินดีต้อนรับ {member.mention} สู่ {guild.name}!", file=discord.File(buf, "welcome.png"))
-        except Exception as e:
-            print(f"❌ ระบบต้อนรับ Error: {e}")
-
-    @app_commands.command(name="testwelcome", description="ทดสอบระบบต้อนรับ")
-    async def testwelcome(self, interaction: discord.Interaction):
-        await interaction.response.send_message("กำลังสร้างรูป...", ephemeral=True)
-        await self.on_member_join(interaction.user)
-
-async def setup(bot): await bot.add_cog(Welcome(bot))
+async def setup(bot):
+    await bot.add_cog(Welcome(bot))
+    print("✅ Welcome Cog loaded!")

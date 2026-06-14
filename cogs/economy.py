@@ -4,85 +4,74 @@ from discord import app_commands
 import json
 import os
 
-class Economy(commands.Cog):
+class Stats(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.wallet_file = "wallets.json"
-        self.load_wallets()
+        self.stats_file = "stats.json"
+        self.load_stats()
 
-    def load_wallets(self):
-        if os.path.exists(self.wallet_file):
-            with open(self.wallet_file, 'r') as f:
-                self.wallets = json.load(f)
+    def load_stats(self):
+        if os.path.exists(self.stats_file):
+            with open(self.stats_file, 'r') as f:
+                self.stats = json.load(f)
         else:
-            self.wallets = {}
+            self.stats = {}
 
-    def save_wallets(self):
-        with open(self.wallet_file, 'w') as f:
-            json.dump(self.wallets, f, indent=4)
+    def save_stats(self):
+        with open(self.stats_file, 'w') as f:
+            json.dump(self.stats, f, indent=4)
 
-    def get_balance(self, user_id):
-        return int(self.wallets.get(str(user_id), 0))
-
-    def add_balance(self, user_id, amount):
-        user_id = str(user_id)
-        if user_id not in self.wallets:
-            self.wallets[user_id] = 0
-        self.wallets[user_id] += amount
-        self.save_wallets()
-
-    @app_commands.command(name="balance", description="ดูยอดเหรียญ")
-    async def balance(self, interaction: discord.Interaction, member: discord.Member = None):
-        if member is None:
-            member = interaction.user
-        bal = self.get_balance(member.id)
-        embed = discord.Embed(
-            title="💰 ยอดเหรียญ",
-            description=f"{member.mention}\n**เหรียญ:** {bal:,}",
-            color=0xFFD700
-        )
-        await interaction.response.send_message(embed=embed)
-
-    @app_commands.command(name="daily", description="รับเหรียญรายวัน")
-    async def daily(self, interaction: discord.Interaction):
-        self.add_balance(interaction.user.id, 500)
-        embed = discord.Embed(
-            title="✅ รับเหรียญรายวัน",
-            description=f"ได้รับ **500 เหรียญ**!\nรวม: **{self.get_balance(interaction.user.id):,}**",
-            color=0x00FF00
-        )
-        await interaction.response.send_message(embed=embed)
-
-    @app_commands.command(name="transfer", description="ส่งเหรียญให้คน")
-    async def transfer(self, interaction: discord.Interaction, member: discord.Member, amount: int):
-        if self.get_balance(interaction.user.id) < amount:
-            await interaction.response.send_message("❌ เหรียญไม่พอ!", ephemeral=True)
+    @commands.Cog.listener()
+    async def on_message(self, message):
+        if message.author.bot or not message.guild:
             return
         
-        self.add_balance(interaction.user.id, -amount)
-        self.add_balance(member.id, amount)
+        user_id = str(message.author.id)
+        if user_id not in self.stats:
+            self.stats[user_id] = {"messages": 0, "servers": {}}
+        
+        guild_id = str(message.guild.id)
+        if guild_id not in self.stats[user_id]["servers"]:
+            self.stats[user_id]["servers"][guild_id] = 0
+        
+        self.stats[user_id]["messages"] += 1
+        self.stats[user_id]["servers"][guild_id] += 1
+        self.save_stats()
+
+    @app_commands.command(name="mystats", description="ดูสถิติของคุณ")
+    async def mystats(self, interaction: discord.Interaction, member: discord.Member = None):
+        if member is None:
+            member = interaction.user
+        
+        user_id = str(member.id)
+        user_stats = self.stats.get(user_id, {"messages": 0, "servers": {}})
+        
         embed = discord.Embed(
-            title="💸 ส่งเหรียญ",
-            description=f"ส่ง **{amount:,}** เหรียญให้ {member.mention}",
-            color=0x00FF00
+            title="📊 สถิติผู้ใช้",
+            color=0x2E64FE
         )
+        embed.set_author(name=member.name, icon_url=member.avatar.url)
+        embed.add_field(name="ข้อความทั้งหมด", value=f"**{user_stats['messages']:,}**", inline=True)
+        embed.add_field(name="เซิร์ฟเวอร์", value=f"**{len(user_stats['servers'])}**", inline=True)
+        
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="richest", description="ดูคนรวยสุด")
-    async def richest(self, interaction: discord.Interaction):
-        sorted_users = sorted(self.wallets.items(), key=lambda x: x[1], reverse=True)[:10]
-        
-        text = ""
-        for i, (user_id, bal) in enumerate(sorted_users, 1):
-            text += f"{i}. <@{user_id}> - {bal:,} 💰\n"
-        
+    @app_commands.command(name="serverstats", description="ดูสถิติเซิร์ฟเวอร์")
+    async def serverstats(self, interaction: discord.Interaction):
+        guild = interaction.guild
         embed = discord.Embed(
-            title="💰 อันดับรวยสุด",
-            description=text,
-            color=0xFFD700
+            title="📊 สถิติเซิร์ฟเวอร์",
+            color=0x2E64FE
         )
+        embed.set_thumbnail(url=guild.icon.url if guild.icon else None)
+        embed.add_field(name="ชื่อ", value=guild.name, inline=False)
+        embed.add_field(name="สมาชิก", value=f"**{guild.member_count}**", inline=True)
+        embed.add_field(name="บ๊อต", value=f"**{sum(1 for m in guild.members if m.bot)}**", inline=True)
+        embed.add_field(name="ช่อน", value=f"**{len(guild.channels)}**", inline=True)
+        embed.add_field(name="ยศ", value=f"**{len(guild.roles)}**", inline=True)
+        
         await interaction.response.send_message(embed=embed)
 
 async def setup(bot):
-    await bot.add_cog(Economy(bot))
-    print("✅ Economy Cog loaded!")
+    await bot.add_cog(Stats(bot))
+    print("✅ Stats Cog loaded!")

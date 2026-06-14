@@ -1,5 +1,7 @@
 discord.py
-Pillow
+flask
+aiohttp
+pillow
 imageio
 pytz
-aiohttp
+numpy

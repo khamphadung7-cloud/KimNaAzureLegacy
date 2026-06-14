@@ -1,4 +1,6 @@
-import discord, asyncio, random
+import discord
+import asyncio
+import random
 from discord import app_commands
 from discord.ext import commands
 
@@ -9,9 +11,10 @@ class RandomMute(commands.Cog):
     @app_commands.command(name="randommute", description="สุ่ม Mute สมาชิกในห้องนี้ชั่วคราว")
     @app_commands.checks.has_permissions(administrator=True)
     async def randommute(self, interaction: discord.Interaction):
+        # 1. แจ้ง Discord ว่ากำลังทำงาน (Defer)
         await interaction.response.defer()
         
-        # กรองเอาแค่คน ไม่เอาบอต และไม่เอาตัวคนสั่ง
+        # 2. กรองสมาชิก (เอาเฉพาะคน, ไม่เอาบอต, ไม่เอาคนสั่ง)
         members = [m for m in interaction.channel.members if not m.bot and m.id != interaction.user.id]
         
         if not members:
@@ -20,26 +23,29 @@ class RandomMute(commands.Cog):
         target = random.choice(members)
         mute_minutes = random.randint(1, 10) 
         
-        # ประกาศเตือน
-        msg = await interaction.followup.send(f"⚠️ **[SYSTEM MUTE]**\n{target.mention} โดนสุ่ม Mute เป็นเวลา **{mute_minutes} นาที**!")
+        # 3. ประกาศเตือน
+        msg = await interaction.followup.send(f"⚠️ **[SYSTEM MUTE]**\nโชคร้าย! {target.mention} โดนสุ่ม Mute เป็นเวลา **{mute_minutes} นาที**!")
         
-        # Mute โดยแก้ Permission ห้องนั้น
+        # 4. ทำการ Mute
         overwrite = interaction.channel.overwrites_for(target)
         overwrite.send_messages = False
         await interaction.channel.set_permissions(target, overwrite=overwrite)
         
-        # รอเวลาครบ
+        # 5. รอจนครบเวลา (ทำงานแบบ Background เพื่อไม่ให้บอตค้าง)
         await asyncio.sleep(mute_minutes * 60)
         
-        # ปลด Mute
+        # 6. ปลด Mute
         overwrite.send_messages = True
         await interaction.channel.set_permissions(target, overwrite=overwrite)
         
-        # ลบข้อความหลังผ่านไป 30 วินาที
+        # 7. เก็บงาน (ลบข้อความ)
         await asyncio.sleep(30)
-        try: await msg.delete()
-        except: pass
+        try: 
+            await msg.delete()
+        except: 
+            pass
 
+# ฟังก์ชันสำหรับโหลด Cog
 async def setup(bot):
     await bot.add_cog(RandomMute(bot))
-  
+    print("✅ RandomMute Cog loaded successfully!")

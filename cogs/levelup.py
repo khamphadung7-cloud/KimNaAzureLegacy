@@ -25,17 +25,18 @@ class LevelUp(commands.Cog):
     def get_user_data(self, user_id):
         user_id = str(user_id)
         if user_id not in self.levels:
-            self.levels[user_id] = {"level": 1, "exp": 0}
+            self.levels[user_id] = {"level": 1, "exp": 0, "messages": 0}
         return self.levels[user_id]
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        if message.author.bot:
+        if message.author.bot or not message.guild:
             return
         
         user_data = self.get_user_data(message.author.id)
-        exp_gain = random.randint(5, 15)
+        exp_gain = random.randint(10, 25)
         user_data["exp"] += exp_gain
+        user_data["messages"] += 1
         
         exp_needed = user_data["level"] * 100
         
@@ -45,10 +46,14 @@ class LevelUp(commands.Cog):
             
             embed = discord.Embed(
                 title="🎉 ระดับขึ้น!",
-                description=f"{message.author.mention} ขึ้นระดับเป็น **{user_data['level']}**",
+                description=f"{message.author.mention} ขึ้นระดับเป็น **Level {user_data['level']}**!",
                 color=0x00FF00
             )
-            await message.channel.send(embed=embed)
+            embed.set_thumbnail(url=message.author.avatar.url)
+            try:
+                await message.channel.send(embed=embed)
+            except:
+                pass
         
         self.save_levels()
 
@@ -58,14 +63,21 @@ class LevelUp(commands.Cog):
             member = interaction.user
         
         user_data = self.get_user_data(member.id)
+        exp_needed = user_data["level"] * 100
+        exp_percent = (user_data["exp"] / exp_needed) * 100
         
         embed = discord.Embed(
             title="📊 ระดับ",
             color=0x2E64FE
         )
-        embed.add_field(name="สมาชิก", value=member.mention, inline=False)
-        embed.add_field(name="ระดับ", value=user_data["level"], inline=False)
-        embed.add_field(name="ประสบการณ์", value=f"{user_data['exp']}/{user_data['level'] * 100}", inline=False)
+        embed.set_author(name=member.name, icon_url=member.avatar.url)
+        embed.add_field(name="ระดับ", value=f"**{user_data['level']}**", inline=True)
+        embed.add_field(name="ประสบการณ์", value=f"`{user_data['exp']}/{exp_needed}`", inline=True)
+        embed.add_field(name="ข้อความ", value=f"`{user_data['messages']}`", inline=True)
+        
+        # Progress bar
+        bar = "█" * int(exp_percent / 10) + "░" * (10 - int(exp_percent / 10))
+        embed.add_field(name="ความคืบหน้า", value=f"{bar} {exp_percent:.1f}%", inline=False)
         
         await interaction.response.send_message(embed=embed)
 
@@ -77,16 +89,15 @@ class LevelUp(commands.Cog):
             reverse=True
         )[:10]
         
-        leaderboard_text = ""
+        text = ""
         for i, (user_id, data) in enumerate(sorted_users, 1):
-            leaderboard_text += f"{i}. <@{user_id}> - Level {data['level']}\n"
+            text += f"**{i}.** <@{user_id}> - Level **{data['level']}** ({data['messages']} messages)\n"
         
         embed = discord.Embed(
             title="🏆 ตารางอันดับ",
-            description=leaderboard_text,
+            description=text or "ยังไม่มีข้อมูล",
             color=0xFFD700
         )
-        
         await interaction.response.send_message(embed=embed)
 
 async def setup(bot):

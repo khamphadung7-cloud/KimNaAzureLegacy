@@ -1,14 +1,12 @@
-name=cogs/__init__.py
 """
 🎯 KIMNA AZURE LEGACY - Cogs Manager
 บัญชีรายการ Cogs ทั้งหมด
 """
-import os
 import logging
 
 logger = logging.getLogger("CogManager")
 
-# ✅ Cogs ทั้งหมด (49 ไฟล์)
+# ✅ Cogs ทั้งหมด (รวม 54 ไฟล์)
 AVAILABLE_COGS = [
     # 🏗️ ระบบการตั้งค่า
     "all_in_one",           # ✨ สร้างเซิร์ฟเวอร์อัตโนมัติ
@@ -41,7 +39,7 @@ AVAILABLE_COGS = [
     # 🎮 ความบันเทิง
     "fun_commands",          # 🎉 คำสั่งสนุก
     "games",                 # 🎯 เกม
-    "trivia",                # 🧠 ข้อมูลทั่วไป
+    "trivia",                 # 🧠 ข้อมูลทั่วไป
     "music",                 # 🎵 ดนตรี
     
     # 📊 ระบบตรวจสอบ
@@ -77,6 +75,18 @@ AVAILABLE_COGS = [
     "nickname_system",       # 📛 ระบบชื่อเล่น
     "mod_notes",             # 📝 หมายเหตุ Mod
     "database",              # 🗄️ ฐานข้อมูล
+    
+    # 🆕 10 Cogs ใหม่
+    "crypto_tracker",        # 🪙 Crypto
+    "fortune_telling",       # 🔮 บอกดวง
+    "image_editor",          # 🎨 แต่งรูป
+    "dm_system",             # 💬 DM
+    "ai_chat",               # 🤖 AI Chat
+    "achievement",           # 🏆 Achievement
+    "cleverbot",             # 💭 CleverBot
+    "auto_respond",          # 🔄 Auto Respond
+    "gpt_simple",            # 🧠 Simple GPT
+    "stats_tracker",         # 📊 Stats
 ]
 
 __all__ = AVAILABLE_COGS

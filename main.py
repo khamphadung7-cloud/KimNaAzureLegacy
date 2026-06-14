@@ -4,36 +4,67 @@ from discord import app_commands
 from flask import Flask
 from threading import Thread
 
-# 1. ระบบ Web Server
+# 1. ระบบ Web Server (24/7)
 app = Flask(__name__)
 @app.route('/')
-def home(): return "✅ KIMNA AZURE ACTIVE"
+def home(): return "✅ KIMNA AZURE SYSTEM ONLINE"
 Thread(target=lambda: app.run(host='0.0.0.0', port=8080)).start()
 
 # 2. ตั้งค่าบอต
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-@bot.event
-async def on_ready():
-    bot.session = aiohttp.ClientSession()
-    await bot.tree.sync()
-    print(f"✅ บอต {bot.user} เชื่อมต่อแล้ว!")
-
-# 3. คำสั่งสุ่ม Mute
+# 3. คำสั่งสุ่ม Mute (รวมไว้ที่นี่ที่เดียว)
 @bot.tree.command(name="randommute", description="สุ่ม Mute สมาชิกในห้อง")
 @app_commands.checks.has_permissions(administrator=True)
 async def randommute(interaction: discord.Interaction):
     await interaction.response.defer()
     members = [m for m in interaction.channel.members if not m.bot and m.id != interaction.user.id]
-    if not members: return await interaction.followup.send("❌ ไม่มีคนให้สุ่ม!")
+    
+    if not members:
+        return await interaction.followup.send("❌ ไม่มีคนให้สุ่มในห้องนี้!")
     
     target = random.choice(members)
     mute_minutes = random.randint(1, 10)
-    msg = await interaction.followup.send(f"⚠️ {target.mention} โดนสุ่ม Mute **{mute_minutes} นาที**!")
     
+    msg = await interaction.followup.send(f"⚠️ **[SYSTEM ALERT]**\nโชคร้าย! {target.mention} ถูกสุ่ม Mute เป็นเวลา **{mute_minutes} นาที**!")
+    
+    # ปิดการพิมพ์
     overwrite = interaction.channel.overwrites_for(target)
     overwrite.send_messages = False
+    await interaction.channel.set_permissions(target, overwrite=overwrite)
+    
+    # รอเวลา
+    await asyncio.sleep(mute_minutes * 60)
+    
+    # คืนสิทธิ์
+    overwrite.send_messages = True
+    await interaction.channel.set_permissions(target, overwrite=overwrite)
+    try: await target.send(f"✅ คุณพ้นโทษ Mute ในห้อง {interaction.channel.name} แล้วครับ")
+    except: pass
+    
+    # ลบข้อความประกาศ
+    await asyncio.sleep(30)
+    try: await msg.delete()
+    except: pass
+
+# 4. จุดเริ่มต้นบอต
+@bot.event
+async def on_ready():
+    bot.session = aiohttp.ClientSession()
+    try:
+        await bot.tree.sync()
+        print(f"✅ บอต {bot.user} พร้อมรบและ Sync คำสั่ง / เรียบร้อยแล้ว!")
+    except Exception as e:
+        print(f"❌ Error syncing commands: {e}")
+
+# 5. รันบอตด้วย Token จาก Environment เท่านั้น
+token = os.environ.get("DISCORD_TOKEN")
+if __name__ == "__main__":
+    if token:
+        bot.run(token)
+    else:
+        print("❌ ERROR: ไม่พบ DISCORD_TOKEN ใน Render!")
     await interaction.channel.set_permissions(target, overwrite=overwrite)
     await asyncio.sleep(mute_minutes * 60)
     overwrite.send_messages = True

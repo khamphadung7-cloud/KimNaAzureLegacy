@@ -1,7 +1,10 @@
-discord.py
-flask
-aiohttp
-pillow
-imageio
-pytz
-numpy
+name=requirements.txt
+discord.py==2.4.0
+flask==3.0.0
+aiohttp==3.9.3
+pillow==10.2.0
+imageio==2.34.2
+pytz==2024.1
+numpy==1.26.4
+python-dotenv==1.0.1
+requests==2.31.0

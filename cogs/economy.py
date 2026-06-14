@@ -38,7 +38,7 @@ class Economy(commands.Cog):
         bal = self.get_balance(member.id)
         embed = discord.Embed(
             title="💰 ยอดเหรียญ",
-            description=f"{member.mention} มีเหรียญ **{bal:,}** เหรียญ",
+            description=f"{member.mention}\n**เหรียญ:** {bal:,}",
             color=0xFFD700
         )
         await interaction.response.send_message(embed=embed)
@@ -48,7 +48,7 @@ class Economy(commands.Cog):
         self.add_balance(interaction.user.id, 500)
         embed = discord.Embed(
             title="✅ รับเหรียญรายวัน",
-            description=f"คุณได้รับ **500 เหรียญ**!\nทั้งหมด: **{self.get_balance(interaction.user.id):,}**",
+            description=f"ได้รับ **500 เหรียญ**!\nรวม: **{self.get_balance(interaction.user.id):,}**",
             color=0x00FF00
         )
         await interaction.response.send_message(embed=embed)
@@ -56,15 +56,30 @@ class Economy(commands.Cog):
     @app_commands.command(name="transfer", description="ส่งเหรียญให้คน")
     async def transfer(self, interaction: discord.Interaction, member: discord.Member, amount: int):
         if self.get_balance(interaction.user.id) < amount:
-            await interaction.response.send_message("❌ เหรียญไม่พอ!")
+            await interaction.response.send_message("❌ เหรียญไม่พอ!", ephemeral=True)
             return
         
         self.add_balance(interaction.user.id, -amount)
         self.add_balance(member.id, amount)
         embed = discord.Embed(
             title="💸 ส่งเหรียญ",
-            description=f"ส่ง **{amount:,}** เหรียญให้ {member.mention}\nเหลือ: **{self.get_balance(interaction.user.id):,}**",
+            description=f"ส่ง **{amount:,}** เหรียญให้ {member.mention}",
             color=0x00FF00
+        )
+        await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="richest", description="ดูคนรวยสุด")
+    async def richest(self, interaction: discord.Interaction):
+        sorted_users = sorted(self.wallets.items(), key=lambda x: x[1], reverse=True)[:10]
+        
+        text = ""
+        for i, (user_id, bal) in enumerate(sorted_users, 1):
+            text += f"{i}. <@{user_id}> - {bal:,} 💰\n"
+        
+        embed = discord.Embed(
+            title="💰 อันดับรวยสุด",
+            description=text,
+            color=0xFFD700
         )
         await interaction.response.send_message(embed=embed)
 
